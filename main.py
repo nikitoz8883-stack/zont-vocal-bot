@@ -1,7 +1,8 @@
 import os
 import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import asyncio
 import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -17,7 +18,6 @@ RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
 
 user_state = {}
 
-# --- Веб-сервер для Render (чтобы сервис не считался "мертвым") ---
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -33,7 +33,6 @@ def run_web_server():
     print(f"Веб-сервер запущен на порту {PORT}")
     server.serve_forever()
 
-# --- Логика бота ---
 def load_bookings():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -226,18 +225,20 @@ async def admin(update, context):
     await update.message.reply_text(text, parse_mode="Markdown")
 
 async def post_init(app: Application):
-    """Устанавливаем вебхук после запуска бота."""
     if RENDER_URL:
         webhook_url = f"{RENDER_URL}/webhook"
-        await app.bot.set_webhook(webhook_url)
-        print(f"Вебхук установлен: {webhook_url}")
+        try:
+            await app.bot.delete_webhook(drop_pending_updates=True)
+            await asyncio.sleep(3)
+            await app.bot.set_webhook(webhook_url)
+            print(f"Вебхук установлен: {webhook_url}")
+        except Exception as e:
+            print(f"Ошибка вебхука (не критично): {e}")
 
 def main():
-    # Запускаем веб-сервер в отдельном потоке
     thread = threading.Thread(target=run_web_server, daemon=True)
     thread.start()
 
-    # Запускаем бота
     app = Application.builder().token(TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin))
@@ -257,4 +258,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
