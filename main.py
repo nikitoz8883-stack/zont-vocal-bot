@@ -1,8 +1,6 @@
 import os
 import json
 import asyncio
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -17,21 +15,6 @@ PORT = int(os.environ.get("PORT", 10000))
 RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
 
 user_state = {}
-
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"Bot is running")
-
-    def log_message(self, format, *args):
-        pass
-
-def run_web_server():
-    server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
-    print(f"Веб-сервер запущен на порту {PORT}")
-    server.serve_forever()
 
 def load_bookings():
     if os.path.exists(DATA_FILE):
@@ -226,17 +209,16 @@ async def admin(update, context):
 
 async def post_init(app: Application):
     if RENDER_URL:
+        webhook_url = f"{RENDER_URL}/webhook"
         try:
             await app.bot.delete_webhook(drop_pending_updates=True)
-            await asyncio.sleep(2)
-            print("Старый вебхук удалён")
+            await asyncio.sleep(3)
+            await app.bot.set_webhook(webhook_url)
+            print(f"Вебхук установлен: {webhook_url}")
         except Exception as e:
-            print(f"Ошибка удаления вебхука: {e}")
+            print(f"Ошибка вебхука: {e}")
 
 def main():
-    thread = threading.Thread(target=run_web_server, daemon=True)
-    thread.start()
-
     app = Application.builder().token(TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin))
