@@ -226,14 +226,12 @@ async def admin(update, context):
 
 async def post_init(app: Application):
     if RENDER_URL:
-        webhook_url = f"{RENDER_URL}/webhook"
         try:
             await app.bot.delete_webhook(drop_pending_updates=True)
-            await asyncio.sleep(3)
-            await app.bot.set_webhook(webhook_url)
-            print(f"Вебхук установлен: {webhook_url}")
+            await asyncio.sleep(2)
+            print("Старый вебхук удалён")
         except Exception as e:
-            print(f"Ошибка вебхука (не критично): {e}")
+            print(f"Ошибка удаления вебхука: {e}")
 
 def main():
     thread = threading.Thread(target=run_web_server, daemon=True)
